@@ -1,0 +1,210 @@
+    constructor(x, y, id, name, color = '#ffd989') {
+      super(x, y, 24);
+      this.id = id;
+      this.name = name;
+      this.color = color;
+    }
+  }
+
+  class Companion extends Entity {
+    constructor(x, y) {
+      super(x, y, 22);
+      this.name = '游侠·陆沉';
+      this.maxHp = 140;
+      this.hp = this.maxHp;
+      this.damage = 16;
+      this.speed = 150;
+      this.attackCooldown = 0;
+      this.reviveTimer = 0;
+      this.mode = 'attack';
+    }
+    update(game, dt) {
+      if (this.dead) {
+        this.reviveTimer -= dt;
+        if (this.reviveTimer <= 0) {
+          this.dead = false;
+          this.hp = this.maxHp * 0.55;
+          this.x = game.player.x + 35;
+          this.y = game.player.y + 35;
+          game.message('陆沉重新站了起来。', 'good');
+        }
+        return;
+      }
+      this.attackCooldown -= dt;
+      let target = null;
+      let best = 420;
+      for (const enemy of game.enemies) {
+        if (enemy.dead) continue;
+        const d = distance(this, enemy);
+        if (d < best) { best = d; target = enemy; }
+      }
+      if (target && this.mode === 'attack') {
+        if (best > 58) game.moveEntity(this, target.x - this.x, target.y - this.y, this.speed, dt);
+        else if (this.attackCooldown <= 0) {
+          this.attackCooldown = 1.15;
+          game.dealDamage(target, this.damage + game.state.player.level * 2, 'companion');
+          game.addEffect({ type: 'slash', x: target.x, y: target.y, life: 0.22, color: '#f2cf86' });
+        }
+      } else {
+        const d = distance(this, game.player);
+        if (d > 90) game.moveEntity(this, game.player.x - this.x, game.player.y - this.y, this.speed, dt);
+      }
+    }
+  }
+
+  class Enemy extends Entity {
+    constructor(x, y, type, options = {}) {
+      const spec = ENEMY_TYPES[type];
+      super(x, y, spec.size);
+      this.type = type;
+      this.name = spec.name;
+      this.maxHp = Math.round(spec.hp * (options.scale || 1));
+      this.hp = this.maxHp;
+      this.speed = spec.speed;
+      this.damage = Math.round(spec.damage * (options.scale || 1));
+      this.range = spec.range;
+      this.cooldown = spec.cooldown;
+      this.xp = Math.round(spec.xp * (options.scale || 1));
+      this.color = spec.color;
+      this.armor = spec.armor || 0;
+      this.ranged = spec.ranged || false;
+      this.mage = spec.mage || false;
+      this.elite = spec.elite || false;
+      this.attackTimer = rand(0.2, 1.2);
+      this.slowTimer = 0;
+      this.slowFactor = 1;
+      this.tag = options.tag || null;
+      this.aggroRange = options.aggroRange || 470;
+      this.homeX = x;
+      this.homeY = y;
+    }
+    update(game, dt) {
+      if (this.dead) return;
+      this.attackTimer -= dt;
+      if (this.slowTimer > 0) {
+        this.slowTimer -= dt;
+        if (this.slowTimer <= 0) this.slowFactor = 1;
+      }
+      const targets = [game.player, game.companion].filter(Boolean).filter((target) => !target.dead);
+      let target = targets[0];
+      if (targets.length > 1 && distance(this, targets[1]) < distance(this, targets[0]) * 0.86) target = targets[1];
+      if (!target) return;
+      const d = distance(this, target);
+      if (d > this.aggroRange && distance(this, { x: this.homeX, y: this.homeY }) < 40) return;
+
+      if (this.ranged) {
+        if (d < 130) game.moveEntity(this, this.x - target.x, this.y - target.y, this.speed * this.slowFactor, dt);
+        else if (d > this.range * 0.82) game.moveEntity(this, target.x - this.x, target.y - this.y, this.speed * this.slowFactor, dt);
+        if (d <= this.range && this.attackTimer <= 0) {
+          this.attackTimer = this.cooldown;
+          const dx = target.x - this.x;
+          const dy = target.y - this.y;
+          const l = length(dx, dy);
+          game.projectiles.push(new Projectile({
+            x: this.x, y: this.y - 5,
+            vx: dx / l * (this.mage ? 190 : 250),
+            vy: dy / l * (this.mage ? 190 : 250),
+            damage: this.damage,
+            owner: 'enemy',
+            radius: this.mage ? 13 : 7,
+            color: this.mage ? '#b89fff' : '#d9f4ff',
+            mage: this.mage,
+          }));
+          game.sound.tone(this.mage ? 260 : 180, 0.08, 'triangle', 0.018);
+        }
+      } else {
+        if (d > this.range) game.moveEntity(this, target.x - this.x, target.y - this.y, this.speed * this.slowFactor, dt);
+        else if (this.attackTimer <= 0) {
+          this.attackTimer = this.cooldown;
+          game.dealDamage(target, this.damage, 'enemy');
+          game.addEffect({ type: 'slash', x: target.x, y: target.y, life: 0.2, color: '#ff9aa8' });
+        }
+      }
+    }
+  }
+
+  class Boss extends Enemy {
+    constructor(x, y) {
+      super(x, y, 'guard', { scale: 1 });
+      this.type = 'boss';
+      this.name = '冰魄将军·玄戈';
+      this.maxHp = 980;
+      this.hp = this.maxHp;
+      this.speed = 62;
+      this.damage = 22;
+      this.range = 70;
+      this.radius = 45;
+      this.color = '#67d8ff';
+      this.armor = 7;
+      this.attackTimer = 1.2;
+      this.patternTimer = 2.4;
+      this.summonTimer = 8;
+      this.phase = 1;
+    }
+    update(game, dt) {
+      if (this.dead) return;
+      const ratio = this.hp / this.maxHp;
+      this.phase = ratio > 0.66 ? 1 : ratio > 0.32 ? 2 : 3;
+      this.attackTimer -= dt;
+      this.patternTimer -= dt;
+      this.summonTimer -= dt;
+      const target = game.companion && !game.companion.dead && distance(this, game.companion) < distance(this, game.player) * 0.8
+        ? game.companion : game.player;
+      const d = distance(this, target);
+
+      if (this.phase === 1) {
+        if (d > 75) game.moveEntity(this, target.x - this.x, target.y - this.y, this.speed, dt);
+        else if (this.attackTimer <= 0) {
+          this.attackTimer = 1.35;
+          game.dealDamage(target, this.damage, 'enemy');
+          game.addEffect({ type: 'bossSlash', x: target.x, y: target.y, life: 0.32, color: '#a6efff' });
+        }
+        if (this.patternTimer <= 0) {
+          this.patternTimer = 3.6;
+          game.message('玄戈召来冰锥，注意走位！', 'warn');
+          for (let i = 0; i < 5; i += 1) {
+            const angle = Math.atan2(target.y - this.y, target.x - this.x) + rand(-0.55, 0.55);
+            game.projectiles.push(new Projectile({
+              x: this.x, y: this.y, vx: Math.cos(angle) * 225, vy: Math.sin(angle) * 225,
+              damage: 14, owner: 'enemy', radius: 10, color: '#86eaff', life: 2.8,
+            }));
+          }
+        }
+      } else if (this.phase === 2) {
+        if (this.patternTimer <= 0) {
+          this.patternTimer = 3.2;
+          const dx = target.x - this.x;
+          const dy = target.y - this.y;
+          const l = length(dx, dy);
+          for (let i = 0; i < 7; i += 1) {
+            const spread = (i - 3) * 0.13;
+            const base = Math.atan2(dy, dx) + spread;
+            game.projectiles.push(new Projectile({
+              x: this.x, y: this.y,
+              vx: Math.cos(base) * 255, vy: Math.sin(base) * 255,
+              damage: 16, owner: 'enemy', radius: 11, color: '#9fb6ff', life: 2.6,
+            }));
+          }
+        }
+        if (this.summonTimer <= 0) {
+          this.summonTimer = 9;
+          game.message('冰魄撕开裂隙，冰尸正在涌出。', 'warn');
+          for (let i = 0; i < 3; i += 1) {
+            const angle = (Math.PI * 2 * i) / 3;
+            game.enemies.push(new Enemy(this.x + Math.cos(angle) * 150, this.y + Math.sin(angle) * 150, i === 2 ? 'mage' : 'corpse', { scale: 1.05 }));
+          }
+        }
+        if (d > 100) game.moveEntity(this, target.x - this.x, target.y - this.y, this.speed * 0.9, dt);
+        else if (this.attackTimer <= 0) {
+          this.attackTimer = 1.15;
+          game.dealDamage(target, 25, 'enemy');
+        }
+      } else {
+        if (this.patternTimer <= 0) {
+          this.patternTimer = 2.15;
+          game.addEffect({ type: 'nova', x: this.x, y: this.y, radius: 250, life: 0.65, color: '#d8f7ff' });
+          for (let i = 0; i < 12; i += 1) {
+            const angle = (Math.PI * 2 * i) / 12 + game.time * 0.2;
+            game.projectiles.push(new Projectile({
+              x: this.x, y: this.y, vx: Math.cos(angle) * 235, vy: Math.sin(angle) * 235,
+              damage: 18, owner: 'enemy', radius: 10, color: '#d7f5ff', life: 3,
