@@ -1,0 +1,146 @@
+      const p = this.worldToScreen(effect.x, effect.y, effect.type === 'text' ? 40 + (1 - effect.life / effect.maxLife) * 45 : 8);
+      const ratio = clamp(effect.life / effect.maxLife, 0, 1);
+      ctx.save(); ctx.globalAlpha = ratio;
+      if (effect.type === 'text') {
+        ctx.fillStyle = effect.color; ctx.font = effect.text.startsWith('暴击') ? 'bold 18px sans-serif' : 'bold 15px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(effect.text, p.x, p.y);
+      } else if (['nova', 'level', 'bossDeath'].includes(effect.type)) {
+        const radius = (effect.radius || 100) * (1 - ratio * .55);
+        ctx.strokeStyle = effect.color; ctx.lineWidth = effect.type === 'bossDeath' ? 7 : 4; ctx.beginPath(); ctx.ellipse(p.x, p.y, radius * ISO_X * 1.4, radius * ISO_Y * 1.4, 0, 0, Math.PI * 2); ctx.stroke();
+      } else if (effect.type === 'slash' || effect.type === 'bossSlash') {
+        ctx.strokeStyle = effect.color; ctx.lineWidth = effect.type === 'bossSlash' ? 8 : 5; ctx.beginPath(); ctx.arc(p.x, p.y - 25, 30, -1.2, 1.1); ctx.stroke();
+      } else if (effect.type === 'guard') {
+        ctx.strokeStyle = effect.color; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y - 30, 38 + Math.sin(this.time * 7) * 4, 0, Math.PI * 2); ctx.stroke();
+      } else if (effect.type === 'heal') {
+        ctx.fillStyle = effect.color; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('+', p.x, p.y - 18);
+      } else {
+        ctx.fillStyle = effect.color; ctx.beginPath(); ctx.arc(p.x, p.y - 15, 35 * (1 - ratio * .5), 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    drawCursor() {
+      const ctx = this.ctx;
+      if (this.player.clickTarget) {
+        const p = this.worldToScreen(this.player.clickTarget.x, this.player.clickTarget.y);
+        ctx.strokeStyle = 'rgba(154,239,255,.7)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 18, 9, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+      if (this.player.attackTarget && !this.player.attackTarget.dead) {
+        const p = this.worldToScreen(this.player.attackTarget.x, this.player.attackTarget.y);
+        ctx.strokeStyle = '#ff879b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y - 30, 30 + Math.sin(this.time * 6) * 3, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1;
+      }
+    }
+
+    drawVignette() {
+      const ctx = this.ctx;
+      const gradient = ctx.createRadialGradient(W / 2, H / 2, H * .2, W / 2, H / 2, H * .8);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)'); gradient.addColorStop(1, 'rgba(0,7,12,.48)');
+      ctx.fillStyle = gradient; ctx.fillRect(0, 0, W, H);
+    }
+
+    updateUI() {
+      if (this.mode === 'dialogue') {
+        const pressedAdvance = ['enter', 'e', ' '].some((key) => this.input.wasPressed(key));
+        const heldAdvance = ['enter', 'e', ' '].some((key) => this.input.down(key)) && this.dialogueRepeatCooldown <= 0;
+        if (pressedAdvance || heldAdvance) {
+          this.dialogueRepeatCooldown = 0.35;
+          this.dialogueAction?.();
+        }
+      }
+      if (!this.scene) return;
+      const p = this.state.player;
+      this.ui.hpBar.style.width = `${clamp(p.hp / p.maxHp * 100, 0, 100)}%`;
+      this.ui.energyBar.style.width = `${clamp(p.energy / p.maxEnergy * 100, 0, 100)}%`;
+      this.ui.xpBar.style.width = `${clamp(p.xp / p.nextXp * 100, 0, 100)}%`;
+      this.ui.hpText.textContent = `${Math.max(0, Math.round(p.hp))} / ${p.maxHp}`;
+      this.ui.energyText.textContent = `${Math.round(p.energy)} / ${p.maxEnergy}`;
+      this.ui.levelText.textContent = `Lv.${p.level}`;
+      this.ui.potionCount.textContent = p.potions;
+      this.ui.questTracker.innerHTML = this.questTrackerText();
+      if (this.currentInteractable && this.mode === 'playing') {
+        this.ui.context.textContent = `按 E · ${this.currentInteractable.label}`;
+        this.ui.context.classList.remove('hidden');
+      } else this.ui.context.classList.add('hidden');
+      document.querySelectorAll('.skill').forEach((button) => {
+        const id = Number(button.dataset.skill);
+        const ratio = this.player.cooldowns[id] / SKILLS[id].cooldown;
+        button.querySelector('i').style.height = `${ratio * 100}%`;
+        button.disabled = ratio > 0 || p.energy < SKILLS[id].energy;
+        button.title = ratio > 0 ? `${SKILLS[id].name}：${this.player.cooldowns[id].toFixed(1)} 秒` : SKILLS[id].name;
+      });
+      if (this.boss && !this.boss.dead) {
+        this.ui.bossHud.classList.remove('hidden');
+        this.ui.bossName.textContent = this.boss.name;
+        this.ui.bossPhase.textContent = ['第一阶段 · 冰锥', '第二阶段 · 召魂', '第三阶段 · 暴走'][this.boss.phase - 1];
+        this.ui.bossBar.style.width = `${clamp(this.boss.hp / this.boss.maxHp * 100, 0, 100)}%`;
+      } else this.ui.bossHud.classList.add('hidden');
+    }
+
+    questTrackerText() {
+      const q = this.state.quests;
+      if (q.main === 0) return '<b>主线 · 寒霜村异变</b>与村长韩伯交谈';
+      if (q.shards < 3) return `<b>主线 · 北境雪原</b>收集冰魄碎片 ${q.shards}/3`;
+      if (!q.seals.every(Boolean)) return `<b>主线 · 沉冰地宫</b>激活三道封印 ${q.seals.filter(Boolean).length}/3`;
+      if (!q.bossDefeated) return '<b>主线 · 冰魄祭坛</b>击败冰魄将军玄戈';
+      return '<b>章节完成</b>寒霜村的命运已被改写';
+    }
+  }
+
+  function runSmokeTests(game) {
+    const report = document.getElementById('test-report');
+    report.classList.remove('hidden');
+    const results = [];
+    const test = (name, fn) => {
+      try { fn(); results.push({ name, pass: true }); }
+      catch (error) { results.push({ name, pass: false, error: error.message }); }
+    };
+    test('四个场景定义完整', () => {
+      const scenes = sceneDefinitions();
+      ['village', 'snowfield', 'dungeon', 'boss'].forEach((id) => { if (!scenes[id]) throw new Error(`缺少 ${id}`); });
+    });
+    test('新游戏状态可创建', () => {
+      const state = createDefaultState();
+      if (state.player.hp !== 120 || state.quests.main !== 0) throw new Error('默认状态错误');
+    });
+    test('隐藏结局判定严格', () => {
+      game.state = createDefaultState();
+      game.state.quests.rescuedCompanion = true;
+      game.state.quests.forgedWeapon = true;
+      game.state.quests.relics = 3;
+      if (!game.hiddenEndingEligible()) throw new Error('应当满足隐藏结局');
+      game.state.quests.relics = 2;
+      if (game.hiddenEndingEligible()) throw new Error('不应满足隐藏结局');
+    });
+    test('雪原包含三枚固定碎片', () => {
+      const count = sceneDefinitions().snowfield.pickups.filter((p) => p.type === 'shard').length;
+      if (count !== 3) throw new Error(`实际 ${count} 枚`);
+    });
+    test('地宫包含三道封印与三枚遗物', () => {
+      const dungeon = sceneDefinitions().dungeon;
+      if (dungeon.seals.length !== 3) throw new Error('封印数量错误');
+      if (dungeon.pickups.filter((p) => p.type === 'relic').length !== 3) throw new Error('遗物数量错误');
+    });
+    test('固定任务物品 ID 唯一且可持久化', () => {
+      const scenes = sceneDefinitions();
+      const ids = [...scenes.snowfield.pickups, ...scenes.dungeon.pickups].map((p) => p.id);
+      if (ids.some((id) => !id)) throw new Error('存在缺少 ID 的固定物品');
+      if (new Set(ids).size !== ids.length) throw new Error('固定物品 ID 重复');
+    });
+    test('Boss 三阶段阈值正确', () => {
+      const boss = new Boss(0, 0);
+      boss.hp = boss.maxHp;
+      const fake = { companion: null, player: { x: 9999, y: 9999 }, moveEntity() {}, projectiles: [], enemies: [boss], message() {}, addEffect() {}, dealDamage() {}, time: 0 };
+      boss.update(fake, 0);
+      if (boss.phase !== 1) throw new Error('满血应为第一阶段');
+      boss.hp = boss.maxHp * .5; boss.update(fake, 0); if (boss.phase !== 2) throw new Error('半血应为第二阶段');
+      boss.hp = boss.maxHp * .2; boss.update(fake, 0); if (boss.phase !== 3) throw new Error('低血应为第三阶段');
+    });
+    const passed = results.filter((r) => r.pass).length;
+    report.innerHTML = `<h1>Smoke Tests: ${passed}/${results.length} passed</h1>${results.map((r) => `<p class="${r.pass ? 'pass' : 'fail'}">${r.pass ? '✓' : '✗'} ${r.name}${r.error ? ` — ${r.error}` : ''}</p>`).join('')}`;
+    window.__SMOKE_TESTS__ = { passed, total: results.length, results };
+    game.mode = 'test';
+  }
+
+  const game = new Game();
+  window.frostboundGame = game;
+  if (new URLSearchParams(location.search).get('test') === '1') runSmokeTests(game);
+})();
