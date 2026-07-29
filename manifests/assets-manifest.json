@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "game": "shuangjin",
   "chapter": "chapter-01-frozen-dungeon",
-  "updatedAt": "2026-07-29T18:54:00+08:00",
+  "updatedAt": "2026-07-29T19:08:00+08:00",
   "statusFlow": [
     "BACKLOG",
     "PROMPT_READY",
@@ -77,14 +77,23 @@
       "category": "tooling",
       "chapter": "global",
       "batch": "PIPELINE-01",
-      "status": "BACKLOG",
-      "sourceFile": null,
+      "status": "DONE",
+      "sourceFile": "tools/slice-grid/slice_grid.py",
       "promptFile": null,
-      "runtimeFiles": [],
+      "runtimeFiles": [
+        "tools/slice-grid/README.md",
+        "tools/slice-grid/requirements.txt",
+        "tools/slice-grid/tests/test_slice_grid.py"
+      ],
       "atlas": null,
       "inGame": false,
       "issue": 3,
-      "notes": "支持2×2、3×3、4×4和边距参数"
+      "validation": {
+        "syntax": "PASS",
+        "unitTests": "3/3 PASS",
+        "testedAt": "2026-07-29T19:06:00+08:00"
+      },
+      "notes": "支持任意行列，重点覆盖2×2、3×3、4×4；支持边距、格间距、透明裁剪、统一锚点、联系表和SHA-256 Manifest"
     }
   ]
 }
