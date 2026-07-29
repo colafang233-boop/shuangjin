@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "game": "shuangjin",
   "chapter": "chapter-01-frozen-dungeon",
-  "updatedAt": "2026-07-29",
+  "updatedAt": "2026-07-29T18:49:00+08:00",
   "statusFlow": [
     "BACKLOG",
     "PROMPT_READY",
@@ -22,13 +22,14 @@
       "category": "character",
       "chapter": "chapter-01",
       "batch": "S00-01",
-      "status": "BACKLOG",
+      "status": "PROMPT_READY",
       "sourceFile": null,
       "promptFile": "prompts/characters/lingshuang-concept.md",
       "runtimeFiles": [],
       "atlas": null,
       "inGame": false,
-      "notes": "风格锁定第一项"
+      "issue": 2,
+      "notes": "角色唯一视觉基准；提示词已完成，待生成候选并评审"
     },
     {
       "id": "style-lingshuang-directions-001",
@@ -70,6 +71,7 @@
       "runtimeFiles": [],
       "atlas": null,
       "inGame": false,
+      "issue": 3,
       "notes": "支持2×2、3×3、4×4和边距参数"
     }
   ]
