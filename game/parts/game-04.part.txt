@@ -1,0 +1,210 @@
+        clearTimeout(this.saveFade);
+        this.saveFade = setTimeout(() => this.ui.saveIndicator.classList.remove('show'), 1000);
+        this.ui.continueButton.disabled = false;
+      } catch { /* storage can be disabled */ }
+    }
+
+    loadScene(id, options = {}) {
+      const all = sceneDefinitions();
+      const definition = deepClone(all[id]);
+      definition.id = id;
+      // Restore function-valued exit conditions lost by JSON clone.
+      definition.exits = all[id].exits;
+      this.scene = definition;
+      this.state.scene = id;
+      this.enemies = definition.enemies.map(([type, x, y]) => new Enemy(x, y, type));
+      this.npcs = definition.npcs.map((npc) => new NPC(npc.x, npc.y, npc.id, npc.name, npc.color));
+      this.state.world ||= { collectedPickups: [] };
+      this.pickups = definition.pickups
+        .filter((pickup) => !pickup.id || !this.state.world.collectedPickups.includes(pickup.id))
+        .map((pickup) => new Pickup(pickup.x, pickup.y, pickup.type, { id: pickup.id }));
+      this.projectiles = [];
+      this.effects = [];
+      this.walls = [];
+      this.boss = null;
+      if (definition.boss && !this.state.quests.bossDefeated) {
+        this.boss = new Boss(600, 300);
+        this.enemies.push(this.boss);
+      }
+      if (!options.preservePosition) {
+        this.player.x = definition.spawn.x;
+        this.player.y = definition.spawn.y;
+      }
+      this.player.clickTarget = null;
+      this.player.attackTarget = null;
+      this.state.player.x = this.player.x;
+      this.state.player.y = this.player.y;
+      this.companion = this.state.quests.rescuedCompanion ? new Companion(this.player.x + 45, this.player.y + 45) : null;
+      this.currentInteractable = null;
+      this.ui.sceneName.textContent = definition.name;
+      this.ui.bossHud.classList.toggle('hidden', !definition.boss || this.state.quests.bossDefeated);
+      this.message(`进入：${definition.name}`, 'good');
+      this.save();
+      if (id === 'boss' && this.boss) {
+        setTimeout(() => {
+          if (this.mode === 'playing' && this.scene.id === 'boss') {
+            this.showDialogue('冰魄将军·玄戈', '封印已经松动。来者，你是在救这片土地，还是替冰魄打开最后一道门？', [
+              { label: '拔剑迎战', action: () => this.message('击败玄戈，终结冰魄侵蚀。', 'warn') },
+            ]);
+          }
+        }, 250);
+      }
+    }
+
+    loop(now) {
+      const dt = clamp((now - this.lastTime) / 1000, 0, 0.034);
+      this.lastTime = now;
+      this.time += dt;
+      this.interactionRepeatCooldown = Math.max(0, this.interactionRepeatCooldown - dt);
+      this.dialogueRepeatCooldown = Math.max(0, this.dialogueRepeatCooldown - dt);
+      if (this.mode === 'playing') this.update(dt);
+      if (['playing', 'dialogue', 'panel'].includes(this.mode)) this.draw();
+      this.updateUI();
+      this.input.endFrame();
+      requestAnimationFrame((t) => this.loop(t));
+    }
+
+    update(dt) {
+      this.state.stats.elapsed += dt;
+      this.autosaveTimer += dt;
+      if (this.autosaveTimer > 10) { this.autosaveTimer = 0; this.save(); }
+
+      if (this.input.wasPressed('q')) this.togglePanel('quests');
+      if (this.input.wasPressed('i')) this.togglePanel('inventory');
+      if (this.input.wasPressed('escape')) this.closePanel();
+
+      this.player.update(this, dt);
+      this.companion?.update(this, dt);
+      this.enemies.forEach((enemy) => enemy.update(this, dt));
+      this.projectiles.forEach((projectile) => projectile.update(this, dt));
+      this.pickups.forEach((pickup) => pickup.update(this, dt));
+      this.updateWalls(dt);
+      this.updateEffects(dt);
+      this.resolveDeaths();
+      this.resolveSealWave();
+      this.resolveInteractables();
+      this.resolvePlayerDeath();
+      this.projectiles = this.projectiles.filter((projectile) => !projectile.dead);
+      this.pickups = this.pickups.filter((pickup) => !pickup.dead);
+      this.effects = this.effects.filter((effect) => effect.life > 0);
+      this.walls = this.walls.filter((wall) => wall.life > 0);
+      this.enemies = this.enemies.filter((enemy) => !enemy.dead || enemy === this.boss);
+      this.camera.x = W / 2 - (this.player.x - this.player.y) * ISO_X;
+      this.camera.y = H / 2 + 70 - (this.player.x + this.player.y) * ISO_Y;
+      if (this.shake > 0) this.shake -= dt;
+    }
+
+    updateWalls(dt) {
+      for (const wall of this.walls) {
+        wall.life -= dt;
+        for (const enemy of this.enemies) {
+          if (enemy.dead || wall.hit.has(enemy)) continue;
+          if (enemy.x > wall.x && enemy.x < wall.x + wall.w && enemy.y > wall.y && enemy.y < wall.y + wall.h) {
+            wall.hit.add(enemy);
+            enemy.slowTimer = Math.max(enemy.slowTimer, 2.3);
+            enemy.slowFactor = 0.18;
+            this.dealDamage(enemy, Math.round(this.player.attackPower * 0.65), 'player');
+          }
+        }
+      }
+    }
+
+    updateEffects(dt) {
+      for (const effect of this.effects) {
+        effect.life -= dt;
+        if (effect.follow) { effect.x = effect.follow.x; effect.y = effect.follow.y; }
+      }
+    }
+
+    resolveDeaths() {
+      for (const enemy of this.enemies) {
+        if (enemy.hp > 0 || enemy.dead) continue;
+        enemy.dead = true;
+        if (enemy === this.boss) {
+          this.state.quests.bossDefeated = true;
+          this.state.quests.main = 4;
+          this.addEffect({ type: 'bossDeath', x: enemy.x, y: enemy.y, radius: 280, life: 1.5, color: '#d8fbff' });
+          this.sound.tone(120, 0.8, 'sawtooth', 0.03);
+          setTimeout(() => this.resolveEndingChoice(), 900);
+          continue;
+        }
+        this.state.stats.kills += 1;
+        this.gainXp(enemy.xp);
+        if (chance(0.18)) this.pickups.push(new Pickup(enemy.x, enemy.y, 'potion'));
+        if (chance(enemy.elite ? 0.75 : 0.09)) this.pickups.push(new Pickup(enemy.x + 10, enemy.y - 8, 'equipment', { elite: enemy.elite }));
+        this.addEffect({ type: 'burst', x: enemy.x, y: enemy.y, life: 0.5, color: enemy.color });
+      }
+    }
+
+    resolveSealWave() {
+      const active = this.state.quests.activeSeal;
+      if (active === null) return;
+      const stillAlive = this.enemies.some((enemy) => !enemy.dead && enemy.tag === `seal-${active}`);
+      if (!stillAlive) {
+        this.state.quests.seals[active] = true;
+        this.state.quests.activeSeal = null;
+        this.message(`${['西', '东', '北'][active]}封印已经稳定。`, 'good');
+        this.addEffect({ type: 'nova', x: this.scene.seals[active].x, y: this.scene.seals[active].y, radius: 125, life: 0.8, color: '#8ef0ff' });
+        if (this.state.quests.seals.every(Boolean)) {
+          this.state.quests.main = 3;
+          this.message('三道封印已开启，冰魄祭坛的大门显现。', 'warn');
+        }
+        this.save();
+      }
+    }
+
+    resolvePlayerDeath() {
+      if (this.player.hp > 0) return;
+      this.state.stats.deaths += 1;
+      this.player.hp = this.player.maxHp;
+      this.player.energy = this.state.player.maxEnergy;
+      this.message('凌霜被寒气吞没，随后在入口处醒来。', 'bad');
+      if (this.scene.id === 'boss') this.loadScene('boss');
+      else this.loadScene(this.scene.id);
+    }
+
+    resolveInteractables() {
+      let best = null;
+      let bestDistance = 76;
+      for (const npc of this.npcs) {
+        if (npc.id === 'companion' && this.state.quests.rescuedCompanion) continue;
+        if (npc.id === 'daughter' && this.state.quests.daughterFound) continue;
+        const d = distance(this.player, npc);
+        if (d < bestDistance) { bestDistance = d; best = { type: 'npc', data: npc, label: `与 ${npc.name} 交谈` }; }
+      }
+      for (const exit of this.scene.exits) {
+        const cx = exit.x + exit.w / 2;
+        const cy = exit.y + exit.h / 2;
+        const d = Math.hypot(this.player.x - cx, this.player.y - cy);
+        if (d < Math.max(exit.w, exit.h) * 0.65 && d < bestDistance + 40) {
+          best = { type: 'exit', data: exit, label: exit.label };
+          bestDistance = d;
+        }
+      }
+      for (const seal of this.scene.seals || []) {
+        if (this.state.quests.seals[seal.index]) continue;
+        const d = distance(this.player, seal);
+        if (d < 76 && d < bestDistance) { bestDistance = d; best = { type: 'seal', data: seal, label: `激活${seal.name}` }; }
+      }
+      this.currentInteractable = best;
+      const wantsInteract = this.input.wasPressed('e') || (this.input.down('e') && this.interactionRepeatCooldown <= 0);
+      if (best && wantsInteract) {
+        this.interactionRepeatCooldown = 0.35;
+        this.interact(best);
+      }
+    }
+
+    interact(interactable) {
+      if (interactable.type === 'npc') this.interactNPC(interactable.data);
+      if (interactable.type === 'exit') {
+        if (!interactable.data.condition(this)) {
+          if (interactable.data.to === 'snowfield') this.message('先与韩伯交谈，了解村中发生了什么。', 'warn');
+          else if (interactable.data.to === 'dungeon') this.message(`地宫入口需要三枚冰魄碎片（${this.state.quests.shards}/3）。`, 'warn');
+          else this.message('通路仍被封印。', 'warn');
+          return;
+        }
+        const target = interactable.data.to;
+        this.loadScene(target);
+      }
+      if (interactable.type === 'seal') this.activateSeal(interactable.data);
+    }
