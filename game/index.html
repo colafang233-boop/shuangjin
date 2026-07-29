@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="《霜烬：沉冰地宫》在线 ARPG 灰盒垂直切片" />
+  <title>霜烬：沉冰地宫</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main id="app">
+    <canvas id="game" width="1280" height="720" aria-label="霜烬：沉冰地宫游戏画面"></canvas>
+
+    <section id="start-screen" class="screen-layer">
+      <div class="start-card">
+        <p class="eyebrow">原创网页 ARPG · 灰盒垂直切片</p>
+        <h1>霜烬：沉冰地宫</h1>
+        <p class="lead">调查寒霜村失踪事件，穿过雪原，解开三道封印，并决定被冰魄附身的守墓将军最终命运。</p>
+        <div class="button-row">
+          <button id="new-game" class="primary">开始新游戏</button>
+          <button id="continue-game">继续游戏</button>
+        </div>
+        <div class="controls-grid" aria-label="操作说明">
+          <span><kbd>WASD</kbd> / <kbd>方向键</kbd> / 点击地面移动</span>
+          <span><kbd>左键</kbd> 攻击敌人</span>
+          <span><kbd>1-4</kbd> 释放技能</span>
+          <span><kbd>R</kbd> 使用药水</span>
+          <span><kbd>E</kbd> 交互 / 传送</span>
+          <span><kbd>Q</kbd> 任务 · <kbd>I</kbd> 背包</span>
+        </div>
+        <p class="small-note">当前版本使用程序化灰盒图形，不依赖外部素材；后续可批量替换成统一风格贴图。</p>
+      </div>
+    </section>
+
+    <section id="hud" class="hud hidden" aria-label="游戏界面">
+      <div class="top-left">
+        <div class="character-card">
+          <div class="portrait">霜</div>
+          <div class="bars">
+            <div class="bar-row"><span>生命</span><div class="bar"><i id="hp-bar"></i></div><b id="hp-text">100 / 100</b></div>
+            <div class="bar-row"><span>精力</span><div class="bar energy"><i id="energy-bar"></i></div><b id="energy-text">100 / 100</b></div>
+            <div class="bar-row"><span>经验</span><div class="bar xp"><i id="xp-bar"></i></div><b id="level-text">Lv.1</b></div>
+          </div>
+        </div>
+        <div id="quest-tracker" class="quest-tracker"></div>
+      </div>
+
+      <div class="top-right">
+        <div id="scene-name" class="scene-name">寒霜村</div>
+        <div id="save-indicator" class="save-indicator">已自动存档</div>
+      </div>
+
+      <div id="boss-hud" class="boss-hud hidden">
+        <div class="boss-title"><span id="boss-name">冰魄将军</span><b id="boss-phase">第一阶段</b></div>
+        <div class="boss-bar"><i id="boss-bar-fill"></i></div>
+      </div>
+
+      <div id="message-feed" class="message-feed" aria-live="polite"></div>
+      <div id="context-prompt" class="context-prompt hidden">按 E 交互</div>
+
+      <div class="bottom-hud">
+        <div class="potion-slot"><kbd>R</kbd><span>生命药水</span><b id="potion-count">3</b></div>
+        <div class="skill-bar">
+          <button class="skill" data-skill="1"><kbd>1</kbd><span class="skill-icon">刃</span><small>冰刃</small><i></i></button>
+          <button class="skill" data-skill="2"><kbd>2</kbd><span class="skill-icon">环</span><small>霜环</small><i></i></button>
+          <button class="skill" data-skill="3"><kbd>3</kbd><span class="skill-icon">墙</span><small>冰墙</small><i></i></button>
+          <button class="skill" data-skill="4"><kbd>4</kbd><span class="skill-icon">盾</span><small>寒霜护体</small><i></i></button>
+        </div>
+        <div class="quick-menu">
+          <button id="quest-button"><kbd>Q</kbd>任务</button>
+          <button id="inventory-button"><kbd>I</kbd>背包</button>
+        </div>
+      </div>
+    </section>
+
+    <aside id="side-panel" class="side-panel hidden" aria-label="信息面板">
+      <header>
+        <h2 id="panel-title">任务日志</h2>
+        <button id="close-panel" aria-label="关闭面板">×</button>
+      </header>
+      <div id="panel-content"></div>
+    </aside>
+
+    <section id="dialogue" class="dialogue hidden" aria-live="polite">
+      <div id="speaker" class="speaker">村长</div>
+      <p id="dialogue-text"></p>
+      <div id="dialogue-actions" class="dialogue-actions"></div>
+      <span class="dialogue-hint">点击选项，或按 E / Enter / 空格继续</span>
+    </section>
+
+    <section id="ending-screen" class="screen-layer hidden">
+      <div class="ending-card">
+        <p id="ending-kicker" class="eyebrow">章节结束</p>
+        <h2 id="ending-title">冰封未解</h2>
+        <p id="ending-text"></p>
+        <div id="ending-summary" class="ending-summary"></div>
+        <div class="button-row">
+          <button id="restart-game" class="primary">重新开始</button>
+          <button id="return-menu">返回标题</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="test-report" class="test-report hidden" aria-live="polite"></section>
+  </main>
+
+  <script src="loader.js"></script>
+</body>
+</html>
