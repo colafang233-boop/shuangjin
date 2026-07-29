@@ -1,0 +1,210 @@
+          { type: 'rock', x: 240, y: 230 }, { type: 'rock', x: 430, y: 170 },
+          { type: 'tree', x: 150, y: 690 }, { type: 'tree', x: 1320, y: 730 },
+          { type: 'tree', x: 850, y: 180 }, { type: 'rock', x: 1170, y: 620 },
+          { type: 'camp', x: 450, y: 725 },
+        ],
+        npcs: [
+          { x: 450, y: 690, id: 'companion', name: '受伤的游侠', color: '#d3b57a' },
+          { x: 1110, y: 420, id: 'daughter', name: '石小满', color: '#f3a7b8' },
+        ],
+        exits: [
+          { x: 675, y: 990, w: 150, h: 90, to: 'village', label: '返回寒霜村', condition: () => true },
+          { x: 675, y: 25, w: 150, h: 95, to: 'dungeon', label: '沉冰地宫入口', condition: (game) => game.state.quests.shards >= 3 },
+        ],
+        enemies: [
+          ['wolf', 250, 330], ['wolf', 330, 360], ['corpse', 500, 300],
+          ['archer', 780, 520], ['wolf', 820, 590], ['mage', 1010, 610],
+          ['guard', 1190, 520], ['corpse', 1280, 680], ['wolf', 1050, 830],
+          ['beast', 700, 170], ['archer', 375, 790], ['wolf', 530, 830],
+        ],
+        pickups: [
+          { id: 'snow-shard-west', x: 250, y: 250, type: 'shard' },
+          { id: 'snow-shard-center', x: 900, y: 540, type: 'shard' },
+          { id: 'snow-shard-east', x: 1270, y: 760, type: 'shard' },
+          { id: 'snow-potion-camp', x: 570, y: 770, type: 'potion' },
+        ],
+        seals: [],
+      },
+      dungeon: {
+        name: '沉冰地宫', size: { w: 1500, h: 1100 }, tile: 100,
+        colors: { floorA: '#263544', floorB: '#2c3f50', grid: 'rgba(157,221,255,.07)', fog: '#172635' },
+        spawn: { x: 750, y: 975 },
+        obstacles: [
+          { x: 0, y: 0, w: 1500, h: 45, height: 30, color: '#394d5e' },
+          { x: 0, y: 1055, w: 1500, h: 45, height: 30, color: '#394d5e' },
+          { x: 0, y: 45, w: 45, h: 1010, height: 30, color: '#394d5e' },
+          { x: 1455, y: 45, w: 45, h: 1010, height: 30, color: '#394d5e' },
+          { x: 420, y: 430, w: 110, h: 330, height: 45, color: '#40596a', roof: '#547287' },
+          { x: 970, y: 430, w: 110, h: 330, height: 45, color: '#40596a', roof: '#547287' },
+          { x: 650, y: 560, w: 200, h: 80, height: 30, color: '#3a5062', roof: '#5a7488' },
+        ],
+        props: [
+          { type: 'crystal', x: 210, y: 210 }, { type: 'crystal', x: 1290, y: 210 },
+          { type: 'crystal', x: 280, y: 860 }, { type: 'crystal', x: 1220, y: 860 },
+          { type: 'statue', x: 750, y: 360 },
+        ],
+        npcs: [],
+        exits: [
+          { x: 675, y: 1000, w: 150, h: 75, to: 'snowfield', label: '返回北境雪原', condition: () => true },
+          { x: 675, y: 25, w: 150, h: 90, to: 'boss', label: '冰魄祭坛', condition: (game) => game.state.quests.seals.every(Boolean) },
+        ],
+        enemies: [
+          ['corpse', 280, 780], ['archer', 330, 680], ['guard', 620, 790],
+          ['mage', 880, 790], ['corpse', 1180, 770], ['archer', 1260, 650],
+          ['guard', 770, 470], ['corpse', 650, 320], ['mage', 850, 300],
+        ],
+        pickups: [
+          { id: 'dungeon-relic-west', x: 210, y: 310, type: 'relic' },
+          { id: 'dungeon-relic-east', x: 1290, y: 310, type: 'relic' },
+          { id: 'dungeon-relic-center', x: 750, y: 510, type: 'relic' },
+          { id: 'dungeon-potion-entry', x: 1150, y: 900, type: 'potion' },
+        ],
+        seals: [
+          { x: 255, y: 580, index: 0, name: '西封印' },
+          { x: 1245, y: 580, index: 1, name: '东封印' },
+          { x: 750, y: 200, index: 2, name: '北封印' },
+        ],
+      },
+      boss: {
+        name: '冰魄祭坛', size: { w: 1200, h: 900 }, tile: 100,
+        colors: { floorA: '#203748', floorB: '#27485b', grid: 'rgba(145,235,255,.09)', fog: '#122b3b' },
+        spawn: { x: 600, y: 760 },
+        obstacles: [
+          { x: 0, y: 0, w: 1200, h: 45, height: 38, color: '#36556b' },
+          { x: 0, y: 855, w: 1200, h: 45, height: 38, color: '#36556b' },
+          { x: 0, y: 45, w: 45, h: 810, height: 38, color: '#36556b' },
+          { x: 1155, y: 45, w: 45, h: 810, height: 38, color: '#36556b' },
+        ],
+        props: [
+          { type: 'crystal', x: 140, y: 160 }, { type: 'crystal', x: 1060, y: 160 },
+          { type: 'crystal', x: 140, y: 720 }, { type: 'crystal', x: 1060, y: 720 },
+          { type: 'altar', x: 600, y: 270 },
+        ],
+        npcs: [], exits: [], enemies: [], pickups: [], seals: [], boss: true,
+      },
+    };
+  }
+
+  class Game {
+    constructor() {
+      this.canvas = document.getElementById('game');
+      this.ctx = this.canvas.getContext('2d');
+      this.input = new Input(this.canvas);
+      this.sound = new SoundBank();
+      this.state = createDefaultState();
+      this.player = new Player(this.state.player);
+      this.scene = null;
+      this.enemies = [];
+      this.npcs = [];
+      this.pickups = [];
+      this.projectiles = [];
+      this.effects = [];
+      this.walls = [];
+      this.companion = null;
+      this.boss = null;
+      this.currentInteractable = null;
+      this.mode = 'menu';
+      this.time = 0;
+      this.lastTime = performance.now();
+      this.autosaveTimer = 0;
+      this.camera = { x: 0, y: 0 };
+      this.shake = 0;
+      this.dialogueAction = null;
+      this.interactionRepeatCooldown = 0;
+      this.dialogueRepeatCooldown = 0;
+      this.bindUI();
+      this.drawMenuBackdrop();
+      requestAnimationFrame((t) => this.loop(t));
+    }
+
+    bindUI() {
+      this.ui = {
+        start: document.getElementById('start-screen'), hud: document.getElementById('hud'),
+        ending: document.getElementById('ending-screen'), dialogue: document.getElementById('dialogue'),
+        speaker: document.getElementById('speaker'), dialogueText: document.getElementById('dialogue-text'),
+        dialogueActions: document.getElementById('dialogue-actions'), panel: document.getElementById('side-panel'),
+        panelTitle: document.getElementById('panel-title'), panelContent: document.getElementById('panel-content'),
+        context: document.getElementById('context-prompt'), messageFeed: document.getElementById('message-feed'),
+        hpBar: document.getElementById('hp-bar'), hpText: document.getElementById('hp-text'),
+        energyBar: document.getElementById('energy-bar'), energyText: document.getElementById('energy-text'),
+        xpBar: document.getElementById('xp-bar'), levelText: document.getElementById('level-text'),
+        potionCount: document.getElementById('potion-count'), questTracker: document.getElementById('quest-tracker'),
+        sceneName: document.getElementById('scene-name'), saveIndicator: document.getElementById('save-indicator'),
+        bossHud: document.getElementById('boss-hud'), bossName: document.getElementById('boss-name'),
+        bossPhase: document.getElementById('boss-phase'), bossBar: document.getElementById('boss-bar-fill'),
+        endingKicker: document.getElementById('ending-kicker'), endingTitle: document.getElementById('ending-title'),
+        endingText: document.getElementById('ending-text'), endingSummary: document.getElementById('ending-summary'),
+        continueButton: document.getElementById('continue-game'),
+      };
+
+      document.getElementById('new-game').addEventListener('click', () => this.newGame());
+      this.ui.continueButton.addEventListener('click', () => this.continueGame());
+      document.getElementById('restart-game').addEventListener('click', () => this.newGame());
+      document.getElementById('return-menu').addEventListener('click', () => this.returnToMenu());
+      document.getElementById('quest-button').addEventListener('click', () => this.togglePanel('quests'));
+      document.getElementById('inventory-button').addEventListener('click', () => this.togglePanel('inventory'));
+      document.getElementById('close-panel').addEventListener('click', () => this.closePanel());
+      document.querySelectorAll('.skill').forEach((button) => {
+        button.addEventListener('click', () => {
+          if (this.mode === 'playing') this.player.useSkill(this, Number(button.dataset.skill));
+        });
+      });
+      this.ui.continueButton.disabled = !this.hasSave();
+    }
+
+    hasSave() {
+      try { return Boolean(localStorage.getItem(SAVE_KEY)); } catch { return false; }
+    }
+
+    newGame() {
+      try { localStorage.removeItem(SAVE_KEY); } catch { /* no-op */ }
+      this.state = createDefaultState();
+      this.player = new Player(this.state.player);
+      this.mode = 'playing';
+      this.ui.start.classList.add('hidden');
+      this.ui.ending.classList.add('hidden');
+      this.ui.hud.classList.remove('hidden');
+      this.loadScene('village');
+      this.message('在村中寻找韩伯，调查失踪事件。', 'good');
+      this.showDialogue('凌霜', '北境的风里带着不属于人间的寒意。师父留下的最后线索，就在这座村庄。', [
+        { label: '进入寒霜村', action: () => {} },
+      ]);
+    }
+
+    continueGame() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
+        if (!saved || saved.version !== 1) throw new Error('invalid save');
+        this.state = saved;
+        this.state.world ||= { collectedPickups: [] };
+        this.state.world.collectedPickups ||= [];
+        this.player = new Player(this.state.player);
+        this.mode = 'playing';
+        this.ui.start.classList.add('hidden');
+        this.ui.ending.classList.add('hidden');
+        this.ui.hud.classList.remove('hidden');
+        this.loadScene(this.state.scene || 'village', { preservePosition: true });
+        this.message('已读取自动存档。', 'good');
+      } catch {
+        this.message('存档无法读取，已开始新游戏。', 'bad');
+        this.newGame();
+      }
+    }
+
+    returnToMenu() {
+      this.mode = 'menu';
+      this.ui.ending.classList.add('hidden');
+      this.ui.hud.classList.add('hidden');
+      this.ui.start.classList.remove('hidden');
+      this.ui.continueButton.disabled = !this.hasSave();
+      this.drawMenuBackdrop();
+    }
+
+    save() {
+      if (this.mode === 'menu' || this.mode === 'test') return;
+      this.state.scene = this.scene?.id || this.state.scene;
+      this.state.player.x = this.player.x;
+      this.state.player.y = this.player.y;
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(this.state));
+        this.ui.saveIndicator.classList.add('show');
