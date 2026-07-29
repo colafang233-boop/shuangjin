@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "game": "shuangjin",
+  "chapter": "chapter-01-frozen-dungeon",
+  "updatedAt": "2026-07-29",
+  "statusFlow": [
+    "BACKLOG",
+    "PROMPT_READY",
+    "GENERATING",
+    "SELECTING",
+    "REFINING",
+    "CUTTING",
+    "PACKED",
+    "IN_GAME",
+    "DONE",
+    "REJECTED"
+  ],
+  "assets": [
+    {
+      "id": "style-lingshuang-concept-001",
+      "name": "凌霜完整人物设定",
+      "category": "character",
+      "chapter": "chapter-01",
+      "batch": "S00-01",
+      "status": "BACKLOG",
+      "sourceFile": null,
+      "promptFile": "prompts/characters/lingshuang-concept.md",
+      "runtimeFiles": [],
+      "atlas": null,
+      "inGame": false,
+      "notes": "风格锁定第一项"
+    },
+    {
+      "id": "style-lingshuang-directions-001",
+      "name": "凌霜四方向转面",
+      "category": "character",
+      "chapter": "chapter-01",
+      "batch": "S00-02",
+      "status": "BACKLOG",
+      "sourceFile": null,
+      "promptFile": "prompts/characters/lingshuang-directions.md",
+      "runtimeFiles": [],
+      "atlas": null,
+      "inGame": false,
+      "notes": "2×2，同姿态同光源"
+    },
+    {
+      "id": "style-village-props-001",
+      "name": "寒霜村小道具风格板",
+      "category": "environment",
+      "chapter": "chapter-01",
+      "batch": "S00-13",
+      "status": "BACKLOG",
+      "sourceFile": null,
+      "promptFile": "prompts/environment/village-props-style.md",
+      "runtimeFiles": [],
+      "atlas": null,
+      "inGame": false,
+      "notes": "4×4，同材质、留切图边距"
+    },
+    {
+      "id": "tool-grid-slicer-001",
+      "name": "资产板自动切图工具",
+      "category": "tooling",
+      "chapter": "global",
+      "batch": "PIPELINE-01",
+      "status": "BACKLOG",
+      "sourceFile": null,
+      "promptFile": null,
+      "runtimeFiles": [],
+      "atlas": null,
+      "inGame": false,
+      "notes": "支持2×2、3×3、4×4和边距参数"
+    }
+  ]
+}
