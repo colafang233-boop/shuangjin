@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "game": "shuangjin",
   "chapter": "chapter-01-frozen-dungeon",
-  "updatedAt": "2026-07-29T18:49:00+08:00",
+  "updatedAt": "2026-07-29T18:54:00+08:00",
   "statusFlow": [
     "BACKLOG",
     "PROMPT_READY",
@@ -22,14 +22,26 @@
       "category": "character",
       "chapter": "chapter-01",
       "batch": "S00-01",
-      "status": "PROMPT_READY",
+      "status": "GENERATING",
       "sourceFile": null,
       "promptFile": "prompts/characters/lingshuang-concept.md",
       "runtimeFiles": [],
       "atlas": null,
       "inGame": false,
       "issue": 2,
-      "notes": "角色唯一视觉基准；提示词已完成，待生成候选并评审"
+      "generationAttempts": [
+        {
+          "version": "V1",
+          "status": "REJECTED",
+          "reason": "出现生成文字；飘带过多；角色模板化；动画拆分成本过高"
+        },
+        {
+          "version": "V2",
+          "status": "REJECTED",
+          "reason": "错误混入仓库看板、进度信息和大量文字，未形成独立人物母图"
+        }
+      ],
+      "notes": "提示词已固化；两次候选均被拒绝，正式视觉基准尚未产生"
     },
     {
       "id": "style-lingshuang-directions-001",
