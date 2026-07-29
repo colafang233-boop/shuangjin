@@ -1,0 +1,210 @@
+        this.state.world.collectedPickups.push(pickup.data.id);
+      }
+      if (pickup.type === 'shard') {
+        q.shards = Math.min(3, q.shards + 1);
+        this.message(`获得冰魄碎片（${q.shards}/3）`, 'good');
+        if (q.shards >= 3) {
+          q.main = Math.max(q.main, 2);
+          this.message('地宫入口已经响应三枚碎片。', 'warn');
+        }
+      }
+      if (pickup.type === 'relic') {
+        q.relics = Math.min(3, q.relics + 1);
+        this.message(`找到村民遗物（${q.relics}/3）`, 'good');
+      }
+      if (pickup.type === 'potion') {
+        this.state.player.potions += 1;
+        this.message('获得生命药水。', 'good');
+      }
+      if (pickup.type === 'equipment') {
+        if (pickup.data.elite || chance(0.6)) {
+          this.state.player.weaponTier = Math.min(2, this.state.player.weaponTier + 1);
+          this.message('获得更锋利的寒铁武器。', 'good');
+        } else {
+          this.state.player.armorTier = Math.min(2, this.state.player.armorTier + 1);
+          this.message('获得冰纹护甲。', 'good');
+        }
+      }
+      this.sound.tone(760, 0.1, 'sine', 0.018);
+      this.save();
+    }
+
+    usePotion() {
+      const p = this.state.player;
+      if (p.potions <= 0) { this.message('没有生命药水。', 'bad'); return; }
+      if (p.hp >= p.maxHp) { this.message('生命值已经满了。', 'warn'); return; }
+      p.potions -= 1;
+      p.hp = Math.min(p.maxHp, p.hp + 55);
+      this.addEffect({ type: 'heal', x: this.player.x, y: this.player.y, life: 0.7, color: '#7dffc1' });
+      this.sound.tone(520, 0.16, 'sine', 0.02);
+    }
+
+    gainXp(amount) {
+      const p = this.state.player;
+      p.xp += amount;
+      while (p.xp >= p.nextXp) {
+        p.xp -= p.nextXp;
+        p.level += 1;
+        p.nextXp = Math.round(p.nextXp * 1.35);
+        p.maxHp += 18;
+        p.hp = p.maxHp;
+        p.maxEnergy += 7;
+        p.energy = p.maxEnergy;
+        p.attack += 3;
+        this.message(`等级提升至 ${p.level}！生命与攻击得到强化。`, 'good');
+        this.addEffect({ type: 'level', x: this.player.x, y: this.player.y, radius: 90, life: 1.1, color: '#ffe28a' });
+      }
+    }
+
+    dealDamage(target, rawDamage, owner, options = {}) {
+      if (!target || target.dead) return;
+      let armor = target instanceof Player ? target.armor : (target.armor || 0);
+      let damage = Math.max(1, Math.round(rawDamage - armor * 0.7));
+      if (target instanceof Player && target.guardTimer > 0) damage = Math.max(1, Math.round(damage * 0.4));
+      target.hp -= damage;
+      if (owner === 'player') {
+        this.state.stats.damage += damage;
+        if (options.slow && target instanceof Enemy) {
+          target.slowTimer = Math.max(target.slowTimer, options.slow);
+          target.slowFactor = 0.55;
+        }
+      }
+      if (target instanceof Companion && target.hp <= 0) {
+        target.dead = true;
+        target.reviveTimer = 8;
+        this.message('陆沉倒下了，8 秒后会重新加入战斗。', 'bad');
+      }
+      this.effects.push({
+        type: 'text', x: target.x, y: target.y - target.radius, life: 0.75, maxLife: 0.75,
+        text: `${options.crit ? '暴击 ' : ''}${damage}`, color: owner === 'enemy' ? '#ff879b' : (options.crit ? '#ffe081' : '#d9f8ff'),
+      });
+      if (target instanceof Player) this.shake = Math.max(this.shake, 0.14);
+    }
+
+    moveEntity(entity, dx, dy, speed, dt) {
+      const l = length(dx, dy);
+      const stepX = dx / l * speed * dt;
+      const stepY = dy / l * speed * dt;
+      const nx = entity.x + stepX;
+      const ny = entity.y + stepY;
+      if (!this.isBlocked(nx, entity.y, entity.radius, entity)) entity.x = nx;
+      if (!this.isBlocked(entity.x, ny, entity.radius, entity)) entity.y = ny;
+    }
+
+    isBlocked(x, y, radius = 18, entity = null) {
+      if (!this.scene) return false;
+      if (x - radius < 0 || y - radius < 0 || x + radius > this.scene.size.w || y + radius > this.scene.size.h) return true;
+      for (const obstacle of this.scene.obstacles) {
+        if (x + radius > obstacle.x && x - radius < obstacle.x + obstacle.w && y + radius > obstacle.y && y - radius < obstacle.y + obstacle.h) return true;
+      }
+      for (const wall of this.walls) {
+        if (x + radius > wall.x && x - radius < wall.x + wall.w && y + radius > wall.y && y - radius < wall.y + wall.h) return true;
+      }
+      return false;
+    }
+
+    nearestEnemy(origin, maxDistance = Infinity) {
+      let result = null;
+      let best = maxDistance;
+      for (const enemy of this.enemies) {
+        if (enemy.dead) continue;
+        const d = distance(origin, enemy);
+        if (d < best) { best = d; result = enemy; }
+      }
+      return result;
+    }
+
+    enemyAtScreen(sx, sy) {
+      let best = null;
+      let bestDistance = 42;
+      for (const enemy of this.enemies) {
+        if (enemy.dead) continue;
+        const screen = this.worldToScreen(enemy.x, enemy.y);
+        const d = Math.hypot(screen.x - sx, screen.y - sy);
+        if (d < bestDistance) { bestDistance = d; best = enemy; }
+      }
+      return best;
+    }
+
+    addEffect(effect) {
+      effect.maxLife = effect.maxLife || effect.life;
+      this.effects.push(effect);
+    }
+
+    message(text, tone = '') {
+      const element = document.createElement('div');
+      element.className = `message ${tone}`;
+      element.textContent = text;
+      this.ui.messageFeed.appendChild(element);
+      setTimeout(() => element.remove(), 3100);
+    }
+
+    worldToScreen(x, y, z = 0) {
+      const shakeX = this.shake > 0 ? rand(-5, 5) : 0;
+      const shakeY = this.shake > 0 ? rand(-3, 3) : 0;
+      return {
+        x: (x - y) * ISO_X + this.camera.x + shakeX,
+        y: (x + y) * ISO_Y + this.camera.y - z + shakeY,
+      };
+    }
+
+    screenToWorld(sx, sy) {
+      const a = (sx - this.camera.x) / ISO_X;
+      const b = (sy - this.camera.y) / ISO_Y;
+      return { x: (a + b) / 2, y: (b - a) / 2 };
+    }
+
+    drawMenuBackdrop() {
+      const ctx = this.ctx;
+      const gradient = ctx.createLinearGradient(0, 0, 0, H);
+      gradient.addColorStop(0, '#17364a');
+      gradient.addColorStop(1, '#061018');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, W, H);
+      ctx.save();
+      ctx.translate(W / 2, H / 2 + 100);
+      for (let i = -7; i <= 7; i += 1) {
+        for (let j = -5; j <= 5; j += 1) {
+          const x = (i - j) * 64;
+          const y = (i + j) * 31;
+          ctx.beginPath();
+          ctx.moveTo(x, y - 31);
+          ctx.lineTo(x + 64, y);
+          ctx.lineTo(x, y + 31);
+          ctx.lineTo(x - 64, y);
+          ctx.closePath();
+          ctx.fillStyle = (i + j) % 2 ? 'rgba(118,218,255,.035)' : 'rgba(255,255,255,.018)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(145,225,255,.055)';
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+      for (let i = 0; i < 80; i += 1) {
+        ctx.fillStyle = `rgba(213,248,255,${rand(.08, .35)})`;
+        ctx.beginPath();
+        ctx.arc(rand(0, W), rand(0, H), rand(0.7, 2.3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    draw() {
+      const ctx = this.ctx;
+      ctx.clearRect(0, 0, W, H);
+      this.drawFloor();
+      this.drawExits();
+
+      const drawables = [];
+      for (const prop of this.scene.props) drawables.push({ sort: prop.x + prop.y, kind: 'prop', data: prop });
+      for (const obstacle of this.scene.obstacles) drawables.push({ sort: obstacle.x + obstacle.y + obstacle.h, kind: 'obstacle', data: obstacle });
+      for (const seal of this.scene.seals || []) drawables.push({ sort: seal.x + seal.y, kind: 'seal', data: seal });
+      for (const pickup of this.pickups) drawables.push({ sort: pickup.x + pickup.y, kind: 'pickup', data: pickup });
+      for (const npc of this.npcs) drawables.push({ sort: npc.x + npc.y, kind: 'npc', data: npc });
+      for (const enemy of this.enemies) if (!enemy.dead) drawables.push({ sort: enemy.x + enemy.y, kind: 'enemy', data: enemy });
+      if (this.companion && !this.companion.dead) drawables.push({ sort: this.companion.x + this.companion.y, kind: 'companion', data: this.companion });
+      drawables.push({ sort: this.player.x + this.player.y, kind: 'player', data: this.player });
+      for (const wall of this.walls) drawables.push({ sort: wall.x + wall.y + wall.h, kind: 'wall', data: wall });
+      drawables.sort((a, b) => a.sort - b.sort);
+
+      for (const item of drawables) {
+        if (item.kind === 'prop') this.drawProp(item.data);
