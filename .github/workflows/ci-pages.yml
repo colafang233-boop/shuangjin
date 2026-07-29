@@ -1,0 +1,80 @@
+name: Validate and deploy online demo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "game/**"
+      - "manifests/**"
+      - "prompts/**"
+      - "tools/**"
+      - ".github/workflows/ci-pages.yml"
+  pull_request:
+    paths:
+      - "game/**"
+      - "manifests/**"
+      - "prompts/**"
+      - "tools/**"
+      - ".github/workflows/ci-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate game and assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run game smoke checks
+        run: node game/tests/smoke.mjs
+
+      - name: Validate asset manifest
+        run: python3 tools/validate-assets/validate_manifest.py
+
+      - name: Test asset validator
+        run: python3 -m unittest discover -s tools/validate-assets/tests -p 'test_*.py'
+
+      - name: Test grid slicer
+        run: |
+          python3 -m pip install -r tools/slice-grid/requirements.txt
+          python3 -m unittest discover -s tools/slice-grid/tests -p 'test_*.py'
+
+  package-pages:
+    name: Package online demo
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload game as Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: game
+
+  deploy-pages:
+    name: Deploy online demo
+    if: github.event_name != 'pull_request'
+    needs: package-pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
