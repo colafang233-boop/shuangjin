@@ -1,0 +1,210 @@
+            }));
+          }
+          if (distance(this, target) < 210) game.dealDamage(target, 12, 'enemy');
+        }
+        if (d > 130) game.moveEntity(this, target.x - this.x, target.y - this.y, this.speed * 1.25, dt);
+        else if (this.attackTimer <= 0) {
+          this.attackTimer = 0.85;
+          game.dealDamage(target, 23, 'enemy');
+        }
+      }
+    }
+  }
+
+  class Player extends Entity {
+    constructor(state) {
+      super(state.x, state.y, 23);
+      this.state = state;
+      this.attackTimer = 0;
+      this.cooldowns = { 1: 0, 2: 0, 3: 0, 4: 0 };
+      this.guardTimer = 0;
+      this.dashTimer = 0;
+      this.dashCooldown = 0;
+      this.facing = { x: 0, y: -1 };
+      this.clickTarget = null;
+      this.attackTarget = null;
+      this.dead = false;
+    }
+    get hp() { return this.state.hp; }
+    set hp(value) { this.state.hp = value; }
+    get maxHp() { return this.state.maxHp; }
+    get energy() { return this.state.energy; }
+    set energy(value) { this.state.energy = value; }
+    get armor() { return this.state.defense + this.state.armorTier * 2; }
+    get attackPower() { return this.state.attack + this.state.weaponTier * 4 + (this.state.level - 1) * 3; }
+
+    update(game, dt) {
+      this.attackTimer -= dt;
+      this.guardTimer -= dt;
+      this.dashCooldown -= dt;
+      for (const key of Object.keys(this.cooldowns)) this.cooldowns[key] = Math.max(0, this.cooldowns[key] - dt);
+      this.energy = clamp(this.energy + 9 * dt, 0, this.state.maxEnergy);
+
+      if (game.input.pointer.clicked) {
+        const clickedEnemy = game.enemyAtScreen(game.input.pointer.x, game.input.pointer.y);
+        if (clickedEnemy) {
+          this.attackTarget = clickedEnemy;
+          this.clickTarget = null;
+        } else {
+          this.attackTarget = null;
+          this.clickTarget = game.screenToWorld(game.input.pointer.x, game.input.pointer.y);
+        }
+      }
+
+      let mx = 0;
+      let my = 0;
+      // 将屏幕方向映射到等距世界坐标：W/S 垂直，A/D 水平。
+      if (game.input.down('w')) { mx -= 1; my -= 1; }
+      if (game.input.down('s')) { mx += 1; my += 1; }
+      if (game.input.down('a')) { mx -= 1; my += 1; }
+      if (game.input.down('d')) { mx += 1; my -= 1; }
+      const keyboardMove = mx !== 0 || my !== 0;
+
+      if (keyboardMove) {
+        this.attackTarget = null;
+        this.clickTarget = null;
+        this.facing = { x: mx, y: my };
+        game.moveEntity(this, mx, my, this.state.speed, dt);
+      } else if (this.attackTarget && !this.attackTarget.dead) {
+        const dx = this.attackTarget.x - this.x;
+        const dy = this.attackTarget.y - this.y;
+        const d = Math.hypot(dx, dy);
+        this.facing = { x: dx / (d || 1), y: dy / (d || 1) };
+        if (d > 72) game.moveEntity(this, dx, dy, this.state.speed, dt);
+        else this.basicAttack(game, this.attackTarget);
+      } else if (this.clickTarget) {
+        const dx = this.clickTarget.x - this.x;
+        const dy = this.clickTarget.y - this.y;
+        const d = Math.hypot(dx, dy);
+        if (d < 14) this.clickTarget = null;
+        else {
+          this.facing = { x: dx / d, y: dy / d };
+          game.moveEntity(this, dx, dy, this.state.speed, dt);
+        }
+      }
+
+      if (game.input.pointer.rightClicked && this.dashCooldown <= 0) {
+        const world = game.screenToWorld(game.input.pointer.x, game.input.pointer.y);
+        const dx = world.x - this.x;
+        const dy = world.y - this.y;
+        const l = length(dx, dy);
+        for (let i = 0; i < 5; i += 1) {
+          const nx = this.x + dx / l * 34;
+          const ny = this.y + dy / l * 34;
+          if (!game.isBlocked(nx, ny, this.radius)) { this.x = nx; this.y = ny; }
+        }
+        this.dashCooldown = 2.2;
+        game.addEffect({ type: 'trail', x: this.x, y: this.y, life: 0.4, color: '#8fe9ff' });
+      }
+
+      if (game.input.wasPressed(' ')) {
+        const target = game.nearestEnemy(this, 100);
+        if (target) this.basicAttack(game, target);
+      }
+      for (let i = 1; i <= 4; i += 1) {
+        if (game.input.wasPressed(String(i))) this.useSkill(game, i);
+      }
+      if (game.input.wasPressed('r')) game.usePotion();
+    }
+
+    basicAttack(game, target) {
+      if (this.attackTimer > 0 || !target || target.dead) return;
+      if (distance(this, target) > 82) return;
+      this.attackTimer = 0.52;
+      const crit = chance(0.1 + this.state.weaponTier * 0.02);
+      const damage = Math.round(this.attackPower * rand(0.88, 1.12) * (crit ? 1.75 : 1));
+      game.dealDamage(target, damage, 'player', { crit });
+      game.addEffect({ type: 'slash', x: target.x, y: target.y, life: 0.2, color: crit ? '#ffe39a' : '#aef0ff' });
+      game.sound.tone(crit ? 600 : 430, 0.045, 'sawtooth', 0.015);
+    }
+
+    useSkill(game, id) {
+      const skill = SKILLS[id];
+      if (!skill || this.cooldowns[id] > 0) return;
+      if (this.energy < skill.energy) { game.message('精力不足。', 'bad'); return; }
+      this.energy -= skill.energy;
+      this.cooldowns[id] = skill.cooldown;
+      const world = game.screenToWorld(game.input.pointer.x, game.input.pointer.y);
+      let dx = world.x - this.x;
+      let dy = world.y - this.y;
+      let l = length(dx, dy);
+      if (Math.hypot(dx, dy) < 20) { dx = this.facing.x; dy = this.facing.y; l = length(dx, dy); }
+      this.facing = { x: dx / l, y: dy / l };
+
+      if (id === 1) {
+        game.projectiles.push(new Projectile({
+          x: this.x, y: this.y, vx: dx / l * 420, vy: dy / l * 420,
+          damage: Math.round(this.attackPower * 1.65), owner: 'player', radius: 12,
+          color: '#8ff0ff', slow: 1.5, pierce: 1, life: 1.8,
+        }));
+        game.sound.tone(720, 0.1, 'triangle', 0.02);
+      }
+      if (id === 2) {
+        game.addEffect({ type: 'nova', x: this.x, y: this.y, radius: 175, life: 0.65, color: '#7ae3ff' });
+        for (const enemy of game.enemies) {
+          if (!enemy.dead && distance(this, enemy) < 175) {
+            game.dealDamage(enemy, Math.round(this.attackPower * 1.22), 'player', { slow: 2.8 });
+          }
+        }
+        game.sound.tone(280, 0.22, 'sine', 0.03);
+      }
+      if (id === 3) {
+        const cx = this.x + dx / l * 115;
+        const cy = this.y + dy / l * 115;
+        game.walls.push({ x: cx - 80, y: cy - 22, w: 160, h: 44, life: 5.2, angle: Math.atan2(dy, dx), hit: new Set() });
+        game.addEffect({ type: 'burst', x: cx, y: cy, life: 0.45, color: '#baf5ff' });
+        game.sound.tone(190, 0.18, 'square', 0.02);
+      }
+      if (id === 4) {
+        this.guardTimer = 5;
+        game.addEffect({ type: 'guard', x: this.x, y: this.y, radius: 55, life: 5, follow: this, color: '#abecff' });
+        game.message('寒霜护体：受到的伤害降低 60%。', 'good');
+        game.sound.tone(340, 0.25, 'sine', 0.025);
+      }
+    }
+  }
+
+  function sceneDefinitions() {
+    return {
+      village: {
+        name: '寒霜村', size: { w: 1400, h: 1000 }, tile: 100,
+        colors: { floorA: '#17303a', floorB: '#1b3944', grid: 'rgba(174,232,248,.055)', fog: '#112934' },
+        spawn: { x: 700, y: 790 },
+        obstacles: [
+          { x: 170, y: 220, w: 300, h: 240, height: 86, color: '#35434c', roof: '#6f7980', label: '铁匠铺' },
+          { x: 865, y: 205, w: 320, h: 250, height: 95, color: '#334854', roof: '#74858e', label: '村长屋' },
+          { x: 535, y: 390, w: 300, h: 210, height: 75, color: '#38444a', roof: '#68747b', label: '祭堂' },
+          { x: 30, y: 30, w: 1340, h: 35, height: 24, color: '#41525b' },
+          { x: 30, y: 935, w: 1340, h: 35, height: 24, color: '#41525b' },
+          { x: 30, y: 65, w: 35, h: 870, height: 24, color: '#41525b' },
+          { x: 1335, y: 65, w: 35, h: 870, height: 24, color: '#41525b' },
+        ],
+        props: [
+          { type: 'tree', x: 100, y: 170 }, { type: 'tree', x: 1280, y: 180 },
+          { type: 'tree', x: 115, y: 780 }, { type: 'tree', x: 1260, y: 760 },
+          { type: 'fire', x: 700, y: 690 }, { type: 'well', x: 720, y: 250 },
+        ],
+        npcs: [
+          { x: 1020, y: 560, id: 'elder', name: '村长·韩伯', color: '#f0c778' },
+          { x: 340, y: 565, id: 'blacksmith', name: '铁匠·石岩', color: '#e39a6a' },
+          { x: 790, y: 625, id: 'keeper', name: '守碑人·素问', color: '#a6b9df' },
+        ],
+        exits: [
+          { x: 635, y: 60, w: 130, h: 90, to: 'snowfield', label: '北门·前往雪原', condition: (game) => game.state.quests.main >= 1 },
+        ],
+        enemies: [], pickups: [], seals: [],
+      },
+      snowfield: {
+        name: '北境雪原', size: { w: 1500, h: 1100 }, tile: 100,
+        colors: { floorA: '#b7d8df', floorB: '#a8ced8', grid: 'rgba(21,65,78,.08)', fog: '#8db9c5' },
+        spawn: { x: 750, y: 970 },
+        obstacles: [
+          { x: 0, y: 0, w: 1500, h: 35, height: 15, color: '#82a9b5' },
+          { x: 0, y: 1065, w: 1500, h: 35, height: 15, color: '#82a9b5' },
+          { x: 0, y: 35, w: 35, h: 1030, height: 15, color: '#82a9b5' },
+          { x: 1465, y: 35, w: 35, h: 1030, height: 15, color: '#82a9b5' },
+          { x: 970, y: 150, w: 260, h: 210, height: 60, color: '#596d75', roof: '#81949b', label: '冰封废墟' },
+          { x: 270, y: 470, w: 240, h: 90, height: 35, color: '#728f99', roof: '#9cb7bf' },
+          { x: 580, y: 260, w: 100, h: 210, height: 45, color: '#66838d', roof: '#8aa6af' },
+        ],
+        props: [
