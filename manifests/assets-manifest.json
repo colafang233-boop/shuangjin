@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "game": "shuangjin",
   "chapter": "chapter-01-frozen-dungeon",
-  "updatedAt": "2026-07-29T19:08:00+08:00",
+  "updatedAt": "2026-07-29T19:12:00+08:00",
   "statusFlow": [
     "BACKLOG",
     "PROMPT_READY",
@@ -39,9 +39,15 @@
           "version": "V2",
           "status": "REJECTED",
           "reason": "错误混入仓库看板、进度信息和大量文字，未形成独立人物母图"
+        },
+        {
+          "version": "V3",
+          "status": "REJECTED",
+          "reason": "定向编辑仍被长会话中的仓库管理语境污染，输出为生产看板而非独立角色母图"
         }
       ],
-      "notes": "提示词已固化；两次候选均被拒绝，正式视觉基准尚未产生"
+      "nextAction": "在独立纯生图上下文中仅加载角色提示词与美术参考，生成无文字母图",
+      "notes": "提示词已固化；三次候选均被拒绝，正式视觉基准尚未产生"
     },
     {
       "id": "style-lingshuang-directions-001",
