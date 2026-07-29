@@ -1,0 +1,210 @@
+
+    interactNPC(npc) {
+      const q = this.state.quests;
+      if (npc.id === 'elder') {
+        if (q.main === 0) {
+          this.showDialogue(npc.name, '三夜以来，村民一个接一个消失。北门外不断传来冰层碎裂的声音，连祭堂里的古碑也开始结霜。', [
+            { label: '我去雪原调查', action: () => { q.main = 1; this.message('主线任务：收集三枚冰魄碎片。', 'good'); this.save(); } },
+            { label: '再准备一下', action: () => {} },
+          ]);
+        } else if (q.main < 4) {
+          this.showDialogue(npc.name, q.shards < 3
+            ? `冰魄碎片散落在雪原深处。你已经找到 ${q.shards}/3 枚。`
+            : '三枚碎片同时发光，沉冰地宫就在雪原北端。那里曾封印着守墓将军玄戈。', [{ label: '明白了', action: () => {} }]);
+        } else {
+          this.showDialogue(npc.name, '风停了。无论你最终做出了什么选择，寒霜村都会记住今天。', [{ label: '告别', action: () => {} }]);
+        }
+      }
+      if (npc.id === 'blacksmith') {
+        if (!q.daughterFound) {
+          this.showDialogue(npc.name, '小满去废墟采矿后就没回来。那里全是冰尸……我不敢奢求你冒险，但若见到她，请带她回来。', [
+            { label: '我会留意她', action: () => this.message('支线：寻找铁匠的女儿石小满。', 'good') },
+          ]);
+        } else if (!q.forgedWeapon) {
+          this.showDialogue(npc.name, '你把小满带回来了。这柄剑我用祖传火种重锻过，能劈开冰魄外壳。拿去。', [
+            { label: '接受重锻', action: () => {
+              q.forgedWeapon = true;
+              this.state.player.weaponTier = Math.max(3, this.state.player.weaponTier);
+              this.message('获得：破冰剑。攻击力显著提升。', 'good');
+              this.save();
+            } },
+          ]);
+        } else {
+          this.showDialogue(npc.name, '破冰剑只认持剑人的决心。别让它蒙尘。', [{ label: '点头', action: () => {} }]);
+        }
+      }
+      if (npc.id === 'keeper') {
+        this.showDialogue(npc.name, q.relics >= 3
+          ? '三枚遗物都在你身上。玄戈的魂还没有彻底消失，它们或许能让他想起自己守护过的人。'
+          : `地宫里埋着三枚村民遗物。若能找齐，也许可以净化玄戈，而不必杀死他。（${q.relics}/3）`, [
+          { label: '我会寻找遗物', action: () => this.message('支线：在地宫寻找三枚村民遗物。', 'good') },
+        ]);
+      }
+      if (npc.id === 'companion') {
+        this.showDialogue(npc.name, '我叫陆沉。冰尸把我的队伍冲散了。给我一点时间，我还能拉开弓。', [
+          { label: '扶他起来', action: () => {
+            q.rescuedCompanion = true;
+            this.companion = new Companion(this.player.x + 40, this.player.y + 30);
+            this.message('陆沉加入队伍，将自动攻击附近敌人。', 'good');
+            this.save();
+          } },
+        ]);
+      }
+      if (npc.id === 'daughter') {
+        this.showDialogue(npc.name, '爹一定急坏了。我躲在墙后听见冰尸说话……它们一直重复“玄戈将醒”。', [
+          { label: '护送她回村', action: () => {
+            q.daughterFound = true;
+            this.message('石小满已沿安全路线返回寒霜村。去找铁匠领取奖励。', 'good');
+            this.save();
+          } },
+        ]);
+      }
+    }
+
+    activateSeal(seal) {
+      const q = this.state.quests;
+      if (q.activeSeal !== null) { this.message('另一道封印仍在震荡，先消灭涌出的怪物。', 'warn'); return; }
+      q.activeSeal = seal.index;
+      const types = seal.index === 2 ? ['guard', 'mage', 'corpse', 'corpse'] : ['wolf', 'corpse', 'archer'];
+      types.forEach((type, i) => {
+        const angle = (Math.PI * 2 * i) / types.length;
+        this.enemies.push(new Enemy(seal.x + Math.cos(angle) * 145, seal.y + Math.sin(angle) * 145, type, { tag: `seal-${seal.index}`, scale: 1.08 }));
+      });
+      this.message(`${seal.name}开始震荡，守卫已经苏醒！`, 'warn');
+      this.addEffect({ type: 'nova', x: seal.x, y: seal.y, radius: 160, life: 0.7, color: '#8fcbff' });
+    }
+
+    showDialogue(speaker, text, actions = []) {
+      this.mode = 'dialogue';
+      this.ui.dialogue.classList.remove('hidden');
+      this.ui.speaker.textContent = speaker;
+      this.ui.dialogueText.textContent = text;
+      this.ui.dialogueActions.innerHTML = '';
+      const finalActions = actions.length ? actions : [{ label: '继续', action: () => {} }];
+      finalActions.forEach((item) => {
+        const button = document.createElement('button');
+        button.textContent = item.label;
+        button.addEventListener('click', () => {
+          this.ui.dialogue.classList.add('hidden');
+          this.mode = 'playing';
+          item.action?.();
+        });
+        this.ui.dialogueActions.appendChild(button);
+      });
+      this.dialogueAction = () => this.ui.dialogueActions.querySelector('button')?.click();
+      this.dialogueRepeatCooldown = 0.35;
+    }
+
+    togglePanel(type) {
+      if (this.mode === 'dialogue' || this.mode === 'ending') return;
+      if (this.mode === 'panel' && this.ui.panel.dataset.type === type) { this.closePanel(); return; }
+      this.mode = 'panel';
+      this.ui.panel.dataset.type = type;
+      this.ui.panel.classList.remove('hidden');
+      if (type === 'quests') this.renderQuestPanel();
+      else this.renderInventoryPanel();
+    }
+
+    closePanel() {
+      if (this.mode !== 'panel') return;
+      this.ui.panel.classList.add('hidden');
+      this.mode = 'playing';
+    }
+
+    renderQuestPanel() {
+      const q = this.state.quests;
+      this.ui.panelTitle.textContent = '任务日志';
+      const mainSteps = [
+        ['与村长韩伯交谈', q.main > 0],
+        [`收集冰魄碎片 ${q.shards}/3`, q.shards >= 3],
+        [`激活地宫封印 ${q.seals.filter(Boolean).length}/3`, q.seals.every(Boolean)],
+        ['击败冰魄将军玄戈', q.bossDefeated],
+      ];
+      this.ui.panelContent.innerHTML = `
+        <section class="panel-section">
+          <h3>主线 · 沉冰地宫</h3>
+          ${mainSteps.map(([label, done], index) => `<div class="status-line ${done ? 'done' : (mainSteps.slice(0, index).every((s) => s[1]) ? 'active' : 'locked')}"><span>${label}</span><b>${done ? '已完成' : '未完成'}</b></div>`).join('')}
+        </section>
+        <section class="panel-section">
+          <h3>支线 · 人间的牵挂</h3>
+          <div class="status-line ${q.rescuedCompanion ? 'done' : 'active'}"><span>救治受伤游侠</span><b>${q.rescuedCompanion ? '已完成' : '未完成'}</b></div>
+          <div class="status-line ${q.forgedWeapon ? 'done' : 'active'}"><span>寻找小满并重锻武器</span><b>${q.forgedWeapon ? '已完成' : q.daughterFound ? '返回铁匠铺' : '未完成'}</b></div>
+          <div class="status-line ${q.relics >= 3 ? 'done' : 'active'}"><span>收集村民遗物 ${q.relics}/3</span><b>${q.relics >= 3 ? '已完成' : '未完成'}</b></div>
+        </section>
+        <section class="panel-section">
+          <h3>隐藏结局条件</h3>
+          <p>救下陆沉、获得破冰剑、收集三枚遗物，才有机会在最终战后净化玄戈。</p>
+        </section>`;
+    }
+
+    renderInventoryPanel() {
+      const p = this.state.player;
+      const q = this.state.quests;
+      this.ui.panelTitle.textContent = '角色与背包';
+      this.ui.panelContent.innerHTML = `
+        <section class="panel-section">
+          <h3>凌霜 · 等级 ${p.level}</h3>
+          <div class="status-line"><span>攻击力</span><b>${this.player.attackPower}</b></div>
+          <div class="status-line"><span>防御力</span><b>${this.player.armor}</b></div>
+          <div class="status-line"><span>最大生命</span><b>${p.maxHp}</b></div>
+        </section>
+        <section class="panel-section">
+          <h3>装备</h3>
+          <div class="item-row"><div class="item-icon">剑</div><div><strong>${q.forgedWeapon ? '破冰剑' : ['旧铁剑', '寒铁剑', '霜纹长剑'][clamp(p.weaponTier - 1, 0, 2)]}</strong><small>武器阶级 ${p.weaponTier}</small></div><b>攻击 +${p.weaponTier * 4}</b></div>
+          <div class="item-row"><div class="item-icon">甲</div><div><strong>${p.armorTier ? '冰纹轻甲' : '旅行斗篷'}</strong><small>护甲阶级 ${p.armorTier}</small></div><b>防御 +${p.armorTier * 2}</b></div>
+        </section>
+        <section class="panel-section">
+          <h3>任务物品</h3>
+          <div class="item-row"><div class="item-icon">晶</div><div><strong>冰魄碎片</strong><small>开启地宫入口</small></div><b>${q.shards}/3</b></div>
+          <div class="item-row"><div class="item-icon">忆</div><div><strong>村民遗物</strong><small>保存玄戈的人性记忆</small></div><b>${q.relics}/3</b></div>
+          <div class="item-row"><div class="item-icon">药</div><div><strong>生命药水</strong><small>按 R 恢复 55 点生命</small></div><b>${p.potions}</b></div>
+        </section>`;
+    }
+
+    resolveEndingChoice() {
+      const eligible = this.hiddenEndingEligible();
+      if (eligible) {
+        this.showDialogue('玄戈残魂', '遗物里的声音……是他们。原来我守护的从来不是封印，而是这些会老去、会害怕，却仍愿意彼此牵挂的人。', [
+          { label: '用遗物净化玄戈', action: () => this.showEnding('hidden') },
+          { label: '斩断冰魄封印', action: () => this.showEnding('normal') },
+        ]);
+      } else {
+        this.showDialogue('玄戈残魂', '没有记忆能够唤回他。冰魄正在吞噬最后一丝人性。', [
+          { label: '结束战斗', action: () => this.showEnding('normal') },
+        ]);
+      }
+    }
+
+    hiddenEndingEligible() {
+      const q = this.state.quests;
+      return q.rescuedCompanion && q.forgedWeapon && q.relics >= 3;
+    }
+
+    showEnding(type) {
+      this.mode = 'ending';
+      this.ui.dialogue.classList.add('hidden');
+      this.ui.hud.classList.add('hidden');
+      this.ui.ending.classList.remove('hidden');
+      const q = this.state.quests;
+      const minutes = Math.max(1, Math.round(this.state.stats.elapsed / 60));
+      if (type === 'hidden') {
+        this.ui.endingKicker.textContent = '隐藏结局 · 守墓人的黎明';
+        this.ui.endingTitle.textContent = '冰雪消融，人心仍在';
+        this.ui.endingText.textContent = '三枚遗物唤回了玄戈的记忆。他主动把冰魄封进自己的铠甲，随后化为第一缕晨雾。寒霜村得救，而凌霜也从他留下的地图上发现：师父曾主动前往更北方的“无昼城”。';
+      } else {
+        this.ui.endingKicker.textContent = '普通结局 · 冰封未解';
+        this.ui.endingTitle.textContent = '封印恢复，谜团仍存';
+        this.ui.endingText.textContent = '玄戈与冰魄一同消散，地宫重新沉寂。村庄暂时安全，但没有人知道是谁唤醒了守墓将军，也没有人能解释师父为何在封印松动前进入地宫。';
+      }
+      this.ui.endingSummary.innerHTML = `
+        <div><span>通关时间</span><b>${minutes} 分钟</b></div>
+        <div><span>击败敌人</span><b>${this.state.stats.kills}</b></div>
+        <div><span>支线完成</span><b>${[q.rescuedCompanion, q.forgedWeapon, q.relics >= 3].filter(Boolean).length}/3</b></div>`;
+      this.save();
+    }
+
+    collectPickup(pickup) {
+      if (pickup.dead) return;
+      pickup.dead = true;
+      const q = this.state.quests;
+      if (pickup.data.id && !this.state.world.collectedPickups.includes(pickup.data.id)) {
